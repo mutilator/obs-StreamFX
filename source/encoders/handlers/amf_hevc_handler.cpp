@@ -1,30 +1,28 @@
-// FFMPEG Video Encoder Integration for OBS Studio
-// Copyright (c) 2019 Michael Fabian Dirks <info@xaymar.com>
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+/*
+ * Modern effects for a modern Streamer
+ * Copyright (C) 2017-2018 Michael Fabian Dirks
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
+ */
 
-#include "nvenc_hevc_handler.hpp"
+#include "amf_hevc_handler.hpp"
 #include "strings.hpp"
 #include "../codecs/hevc.hpp"
 #include "../encoder-ffmpeg.hpp"
+#include "amf_shared.hpp"
 #include "ffmpeg/tools.hpp"
-#include "nvenc_shared.hpp"
 #include "plugin.hpp"
 
 extern "C" {
@@ -35,6 +33,7 @@ extern "C" {
 #pragma warning(pop)
 }
 
+// Settings
 #define KEY_PROFILE "H265.Profile"
 #define KEY_TIER "H265.Tier"
 #define KEY_LEVEL "H265.Level"
@@ -44,8 +43,6 @@ using namespace streamfx::encoder::codec::hevc;
 
 static std::map<profile, std::string> profiles{
 	{profile::MAIN, "main"},
-	{profile::MAIN10, "main10"},
-	{profile::RANGE_EXTENDED, "rext"},
 };
 
 static std::map<tier, std::string> tiers{
@@ -59,41 +56,41 @@ static std::map<level, std::string> levels{
 	{level::L6_0, "6.0"}, {level::L6_1, "6.1"}, {level::L6_2, "6.2"},
 };
 
-void nvenc_hevc_handler::adjust_info(ffmpeg_factory*, const AVCodec*, std::string&, std::string& name, std::string&)
+void amf_hevc_handler::adjust_info(ffmpeg_factory*, const AVCodec*, std::string&, std::string& name, std::string&)
 {
-	name = "NVIDIA NVENC H.265/HEVC (via FFmpeg)";
+	name = "AMD AMF H.265/HEVC (via FFmpeg)";
 }
 
-void nvenc_hevc_handler::get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context, bool)
+void amf_hevc_handler::get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context, bool)
 {
-	nvenc::get_defaults(settings, codec, context);
+	amf::get_defaults(settings, codec, context);
 
 	obs_data_set_default_int(settings, KEY_PROFILE, static_cast<int64_t>(profile::MAIN));
 	obs_data_set_default_int(settings, KEY_TIER, static_cast<int64_t>(profile::MAIN));
 	obs_data_set_default_int(settings, KEY_LEVEL, static_cast<int64_t>(level::UNKNOWN));
 }
 
-bool nvenc_hevc_handler::has_keyframe_support(ffmpeg_factory*)
+bool amf_hevc_handler::has_keyframe_support(ffmpeg_factory*)
 {
 	return true;
 }
 
-bool nvenc_hevc_handler::is_hardware_encoder(ffmpeg_factory* instance)
+bool amf_hevc_handler::is_hardware_encoder(ffmpeg_factory* instance)
 {
 	return true;
 }
 
-bool nvenc_hevc_handler::has_threading_support(ffmpeg_factory* instance)
+bool amf_hevc_handler::has_threading_support(ffmpeg_factory* instance)
 {
 	return false;
 }
 
-bool nvenc_hevc_handler::has_pixel_format_support(ffmpeg_factory* instance)
+bool amf_hevc_handler::has_pixel_format_support(ffmpeg_factory* instance)
 {
-	return true;
+	return false;
 }
 
-void nvenc_hevc_handler::get_properties(obs_properties_t* props, const AVCodec* codec, AVCodecContext* context, bool)
+void amf_hevc_handler::get_properties(obs_properties_t* props, const AVCodec* codec, AVCodecContext* context, bool)
 {
 	if (!context) {
 		this->get_encoder_properties(props, codec);
@@ -102,9 +99,9 @@ void nvenc_hevc_handler::get_properties(obs_properties_t* props, const AVCodec* 
 	}
 }
 
-void nvenc_hevc_handler::update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
+void amf_hevc_handler::update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
 {
-	nvenc::update(settings, codec, context);
+	amf::update(settings, codec, context);
 
 	{ // HEVC Options
 		auto found = profiles.find(static_cast<profile>(obs_data_get_int(settings, KEY_PROFILE)));
@@ -128,14 +125,14 @@ void nvenc_hevc_handler::update(obs_data_t* settings, const AVCodec* codec, AVCo
 	}
 }
 
-void nvenc_hevc_handler::override_update(ffmpeg_instance* instance, obs_data_t* settings)
+void amf_hevc_handler::override_update(ffmpeg_instance* instance, obs_data_t* settings)
 {
-	nvenc::override_update(instance, settings);
+	amf::override_update(instance, settings);
 }
 
-void nvenc_hevc_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
+void amf_hevc_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
 {
-	nvenc::log_options(settings, codec, context);
+	amf::log_options(settings, codec, context);
 
 	DLOG_INFO("[%s]     H.265/HEVC:", codec->name);
 	::ffmpeg::tools::print_av_option_string2(context, "profile", "      Profile",
@@ -146,9 +143,9 @@ void nvenc_hevc_handler::log_options(obs_data_t* settings, const AVCodec* codec,
 											 [](int64_t v, std::string_view o) { return std::string(o); });
 }
 
-void nvenc_hevc_handler::get_encoder_properties(obs_properties_t* props, const AVCodec* codec)
+void amf_hevc_handler::get_encoder_properties(obs_properties_t* props, const AVCodec* codec)
 {
-	nvenc::get_properties_pre(props, codec);
+	amf::get_properties_pre(props, codec);
 
 	{
 		obs_properties_t* grp = props;
@@ -188,16 +185,16 @@ void nvenc_hevc_handler::get_encoder_properties(obs_properties_t* props, const A
 		}
 	}
 
-	nvenc::get_properties_post(props, codec);
+	amf::get_properties_post(props, codec);
 }
 
-void nvenc_hevc_handler::get_runtime_properties(obs_properties_t* props, const AVCodec* codec, AVCodecContext* context)
+void amf_hevc_handler::get_runtime_properties(obs_properties_t* props, const AVCodec* codec, AVCodecContext* context)
 {
-	nvenc::get_runtime_properties(props, codec, context);
+	amf::get_runtime_properties(props, codec, context);
 }
 
-void streamfx::encoder::ffmpeg::handler::nvenc_hevc_handler::migrate(obs_data_t* settings, std::uint64_t version,
-																	 const AVCodec* codec, AVCodecContext* context)
+void streamfx::encoder::ffmpeg::handler::amf_hevc_handler::migrate(obs_data_t* settings, std::uint64_t version,
+																   const AVCodec* codec, AVCodecContext* context)
 {
-	nvenc::migrate(settings, version, codec, context);
+	amf::migrate(settings, version, codec, context);
 }
